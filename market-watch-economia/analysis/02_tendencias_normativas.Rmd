@@ -1,0 +1,352 @@
+---
+title: "Tendencias Normativas y Regulatorias"
+subtitle: "Market Watch Economía - Ministerio de Economía"
+author: "Equipo de Datos"
+date: "`r format(Sys.time(), '%d de %B de %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  dpi = 300
+)
+
+# Cargar librerías
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(scales)
+library(wordcloud2)
+library(textclean)
+```
+
+## Introducción
+
+Este informe analiza las tendencias normativas y regulatorias del Ministerio de Economía, FNE, TDLC y CORFO. El objetivo es identificar patrones en la producción normativa, áreas temáticas prioritarias y evolución temporal de la regulación económica.
+
+**Fuentes analizadas:**
+- Fiscalía Nacional Económica (FNE)
+- Tribunal de Defensa de la Libre Competencia (TDLC)
+- Corporación de Fomento de la Producción (CORFO)
+
+```{r cargar-datos}
+# Cargar datos procesados
+archivo_reciente <- list.files("data/processed", pattern = "datos_consolidados.*\\.rds$", full.names = TRUE)[1]
+
+if (!is.na(archivo_reciente) && file.exists(archivo_reciente)) {
+  datos <- readRDS(archivo_reciente)
+  cat(sprintf("Datos cargados exitosamente: %d registros\n", nrow(datos)))
+} else {
+  cat("No se encontraron datos procesados. Ejecuta primero los scripts de scraping.\n")
+  # Crear datos dummy para demostración
+  set.seed(123)
+  datos <- data.frame(
+    tipo = sample(c("boletin", "investigacion", "resolucion", "causa", "sentencia", "programa", "noticia", "jurisprudencia"), 200, replace = TRUE),
+    titulo = paste("Normativa o Resolución", sample(1:500, 200, replace = TRUE)),
+    resumen = sample(c("Competencia desleal", "Fusión de empresas", "Programa de innovación", "Litio", "Hidrógeno verde", "PYMES", "Subsidios"), 200, replace = TRUE),
+    fuente = sample(c("FNE", "TDLC", "CORFO", "Economía"), 200, replace = TRUE),
+    fecha = seq(as.Date("2023-01-01"), as.Date("2024-12-31"), length.out = 200),
+    stringsAsFactors = FALSE
+  )
+}
+```
+
+## Panorama General
+
+### Distribución de Documentos por Tipo y Fuente
+
+```{r distribucion-tipo-fuente}
+datos %>%
+  count(fuente, tipo) %>%
+  ggplot(aes(x = fuente, y = n, fill = tipo)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Distribución de Documentos por Tipo y Fuente",
+    x = "Fuente",
+    y = "Cantidad",
+    fill = "Tipo"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Evolución Temporal de la Actividad Normativa
+
+```{r evolucion-temporal}
+if ("fecha" %in% names(datos)) {
+  datos_fecha <- datos %>%
+    filter(!is.na(fecha)) %>%
+    mutate(semana = floor_date(fecha, "week"))
+  
+  datos_fecha %>%
+    count(semana, fuente) %>%
+    ggplot(aes(x = semana, y = n, color = fuente, group = fuente)) +
+    geom_line(size = 1) +
+    geom_smooth(method = "loess", se = FALSE, linetype = "dashed") +
+    labs(
+      title = "Evolución Semanal de Actividad Normativa",
+      subtitle = "Con tendencia (línea punteada)",
+      x = "Semana",
+      y = "Cantidad de Documentos",
+      caption = "Fuente: Elaboración propia en base a scraping web"
+    ) +
+    scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+```
+
+## Análisis por Institución
+
+### FNE - Actividad Fiscalizadora
+
+```{r fne-actividad}
+if ("FNE" %in% unique(datos$fuente)) {
+  datos_fne <- datos %>% filter(fuente == "FNE")
+  
+  cat(sprintf("\n=== FNE - Resumen ===\n"))
+  cat(sprintf("Total documentos: %d\n", nrow(datos_fne)))
+  
+  if ("tipo" %in% names(datos_fne)) {
+    cat("\nPor tipo:\n")
+    print(table(datos_fne$tipo))
+  }
+  
+  # Gráfico de evolución
+  if ("fecha" %in% names(datos_fne)) {
+    datos_fne %>%
+      filter(!is.na(fecha)) %>%
+      mutate(mes = floor_date(fecha, "month")) %>%
+      count(mes) %>%
+      ggplot(aes(x = mes, y = n)) +
+      geom_col(fill = "#1f78b4") +
+      geom_smooth(method = "loess", se = FALSE, color = "red") +
+      labs(
+        title = "FNE - Actividad Mensual",
+        x = "Mes",
+        y = "Documentos"
+      ) +
+      scale_x_date(date_labels = "%b %Y") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  }
+} else {
+  cat("No hay datos disponibles para FNE")
+}
+```
+
+### TDLC - Actividad Jurisdiccional
+
+```{r tdlc-actividad}
+if ("TDLC" %in% unique(datos$fuente)) {
+  datos_tdlc <- datos %>% filter(fuente == "TDLC")
+  
+  cat(sprintf("\n=== TDLC - Resumen ===\n"))
+  cat(sprintf("Total documentos: %d\n", nrow(datos_tdlc)))
+  
+  if ("tipo" %in% names(datos_tdlc)) {
+    cat("\nPor tipo:\n")
+    print(table(datos_tdlc$tipo))
+  }
+  
+  # Gráfico de evolución
+  if ("fecha" %in% names(datos_tdlc)) {
+    datos_tdlc %>%
+      filter(!is.na(fecha)) %>%
+      mutate(mes = floor_date(fecha, "month")) %>%
+      count(mes) %>%
+      ggplot(aes(x = mes, y = n)) +
+      geom_col(fill = "#33a02c") +
+      geom_smooth(method = "loess", se = FALSE, color = "red") +
+      labs(
+        title = "TDLC - Actividad Mensual",
+        x = "Mes",
+        y = "Documentos"
+      ) +
+      scale_x_date(date_labels = "%b %Y") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  }
+} else {
+  cat("No hay datos disponibles para TDLC")
+}
+```
+
+### CORFO - Programas de Fomento
+
+```{r corfo-actividad}
+if ("CORFO" %in% unique(datos$fuente)) {
+  datos_corfo <- datos %>% filter(fuente == "CORFO")
+  
+  cat(sprintf("\n=== CORFO - Resumen ===\n"))
+  cat(sprintf("Total documentos: %d\n", nrow(datos_corfo)))
+  
+  if ("tipo" %in% names(datos_corfo)) {
+    cat("\nPor tipo:\n")
+    print(table(datos_corfo$tipo))
+  }
+  
+  # Gráfico de evolución
+  if ("fecha" %in% names(datos_corfo)) {
+    datos_corfo %>%
+      filter(!is.na(fecha)) %>%
+      mutate(mes = floor_date(fecha, "month")) %>%
+      count(mes) %>%
+      ggplot(aes(x = mes, y = n)) +
+      geom_col(fill = "#e31a1c") +
+      geom_smooth(method = "loess", se = FALSE, color = "red") +
+      labs(
+        title = "CORFO - Actividad Mensual",
+        x = "Mes",
+        y = "Documentos"
+      ) +
+      scale_x_date(date_labels = "%b %Y") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  }
+} else {
+  cat("No hay datos disponibles para CORFO")
+}
+```
+
+## Análisis de Contenido
+
+### Nube de Palabras - Títulos de Documentos
+
+```{r nube-palabras, eval=TRUE}
+if ("titulo" %in% names(datos)) {
+  # Preprocesamiento de texto
+  texto_limpio <- datos$titulo %>%
+    tolower() %>%
+    replace_html() %>%
+    replace_emoji() %>%
+    gsub("[^a-záéíóúñü\\s]", "", .) %>%
+    gsub("\\s+", " ", .)
+  
+  # Crear dataframe de frecuencias
+  palabras <- unlist(strsplit(texto_limpio, " "))
+  palabras <- palabras[nchar(palabras) > 3]  # Filtrar palabras cortas
+  
+  # Palabras vacías en español
+  stopwords_es <- c("este", "esta", "estos", "estas", "que", "los", "las", "del", "una", 
+                    "uno", "unos", "unas", "por", "para", "con", "sin", "sobre", 
+                    "entre", "hasta", "desde", "como", "más", "menos", "muy", "tan",
+                    "solo", "también", "pero", "porque", "cuando", "donde", "quien")
+  
+  palabras <- palabras[!palabras %in% stopwords_es]
+  
+  freq_palabras <- table(palabras) %>%
+    as.data.frame() %>%
+    arrange(-Freq) %>%
+    head(50)
+  
+  if (nrow(freq_palabras) > 0) {
+    wordcloud2(freq_palabras, size = 1.5, color = "random-light", shape = "circle")
+  }
+}
+```
+
+### Temas Más Frecuentes por Fuente
+
+```{r temas-frecuentes}
+if ("resumen" %in% names(datos) || "categoria" %in% names(datos)) {
+  columna_contenido <- ifelse("resumen" %in% names(datos), "resumen", "categoria")
+  
+  datos %>%
+    count(fuente, !!sym(columna_contenido), sort = TRUE) %>%
+    group_by(fuente) %>%
+    top_n(5, n) %>%
+    ggplot(aes(x = reorder(get(columna_contenido), n), y = n, fill = fuente)) +
+    geom_bar(stat = "identity") +
+    facet_wrap(~fuente, scales = "free_y") +
+    coord_flip() +
+    labs(
+      title = "Top 5 Temas/Categorías por Fuente",
+      x = "Tema/Categoría",
+      y = "Cantidad"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "none")
+}
+```
+
+## Indicadores Clave
+
+### Métricas de Actividad
+
+```{r metricas}
+if ("fecha" %in% names(datos)) {
+  datos_validos <- datos %>% filter(!is.na(fecha))
+  
+  # Calcular métricas
+  total_documentos <- nrow(datos_validos)
+  periodo_dias <- as.numeric(difftime(max(datos_validos$fecha), min(datos_validos$fecha), units = "days"))
+  promedio_diario <- round(total_documentos / max(periodo_dias, 1), 2)
+  
+  cat("=== MÉTRICAS DE ACTIVIDAD ===\n\n")
+  cat(sprintf("Período analizado: %s a %s\n", min(datos_validos$fecha), max(datos_validos$fecha)))
+  cat(sprintf("Total de documentos: %d\n", total_documentos))
+  cat(sprintf("Promedio diario: %.2f documentos/día\n", promedio_diario))
+  cat(sprintf("Fuentes activas: %d\n", length(unique(datos_validos$fuente))))
+  
+  # Tabla resumen
+  resumen_metricas <- datos_validos %>%
+    group_by(fuente) %>%
+    summarise(
+      total = n(),
+      con_fecha = sum(!is.na(fecha)),
+      primer_registro = min(fecha, na.rm = TRUE),
+      ultimo_registro = max(fecha, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(promedio_diario = round(total / max(as.numeric(difftime(ultimo_registro, primer_registro, units = "days")), 1), 2))
+  
+  cat("\n=== RESUMEN POR FUENTE ===\n")
+  print(resumen_metricas)
+}
+```
+
+## Conclusiones y Recomendaciones
+
+### Hallazgos Principales
+
+1. **Volumen de actividad**: Se ha identificado el volumen total de documentos normativos y regulatorios producidos por las instituciones del Ministerio de Economía.
+
+2. **Tendencias temporales**: El análisis de series temporales permite identificar períodos de mayor actividad regulatoria.
+
+3. **Distribución temática**: Las nubes de palabras y análisis de categorías revelan los temas prioritarios en la agenda regulatoria.
+
+### Recomendaciones
+
+1. **Monitoreo continuo**: Mantener la actualización semanal de datos mediante los scripts de scraping automatizados.
+
+2. **Análisis profundo**: Implementar técnicas de NLP más avanzadas para:
+   - Clasificación automática de documentos
+   - Detección de cambios regulatorios significativos
+   - Análisis de sentimiento en resoluciones
+
+3. **Alertas tempranas**: Configurar sistemas de alerta para:
+   - Nuevas normativas en sectores estratégicos
+   - Cambios en marcos regulatorios clave
+   - Sentencias del TDLC con impacto sectorial
+
+4. **Integración de fuentes**: Incorporar adicionales fuentes como:
+   - Ministerio de Energía (hidrógeno verde)
+   - Ministerio de Minería (litio)
+   - Banco Central (política monetaria)
+
+---
+
+*Informe generado automáticamente el `r format(Sys.time(), '%d/%m/%Y a las %H:%M')`*
+
+*Para más información, contactar al equipo de datos del Ministerio de Economía*

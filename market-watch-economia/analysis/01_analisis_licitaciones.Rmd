@@ -1,0 +1,250 @@
+---
+title: "Análisis de Licitaciones y Compras Públicas"
+subtitle: "Market Watch Economía - Ministerio de Economía"
+author: "Equipo de Datos"
+date: "`r format(Sys.time(), '%d de %B de %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 6,
+  dpi = 300
+)
+
+# Cargar librerías
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(scales)
+```
+
+## Introducción
+
+Este informe presenta un análisis de las licitaciones y compras públicas registradas en el sistema de Mercado Público. El objetivo es identificar tendencias, patrones de gasto y oportunidades de mejora en los procesos de compra del sector público.
+
+**Nota:** Los datos presentados corresponden a información obtenida mediante scraping web de fuentes oficiales.
+
+```{r cargar-datos}
+# Cargar datos procesados
+archivo_reciente <- list.files("data/processed", pattern = "datos_consolidados.*\\.rds$", full.names = TRUE)[1]
+
+if (!is.na(archivo_reciente) && file.exists(archivo_reciente)) {
+  datos <- readRDS(archivo_reciente)
+  cat(sprintf("Datos cargados exitosamente: %d registros\n", nrow(datos)))
+} else {
+  cat("No se encontraron datos procesados. Ejecuta primero los scripts de scraping.\n")
+  # Crear datos dummy para demostración
+  datos <- data.frame(
+    tipo = sample(c("boletin", "investigacion", "resolucion", "causa", "sentencia", "programa", "noticia"), 100, replace = TRUE),
+    titulo = paste("Registro", 1:100),
+    fuente = sample(c("FNE", "TDLC", "CORFO"), 100, replace = TRUE),
+    fecha = seq(as.Date("2024-01-01"), as.Date("2024-12-31"), length.out = 100),
+    stringsAsFactors = FALSE
+  )
+}
+```
+
+## Resumen General
+
+### Total de Registros por Fuente
+
+```{r resumen-fuente}
+datos %>%
+  count(fuente, sort = TRUE) %>%
+  ggplot(aes(x = reorder(fuente, -n), y = n, fill = fuente)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = n), vjust = -0.5, size = 5) +
+  labs(
+    title = "Total de Registros por Fuente",
+    x = "Fuente",
+    y = "Cantidad de Registros",
+    caption = "Fuente: Elaboración propia en base a scraping web"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### Distribución por Tipo de Documento
+
+```{r resumen-tipo}
+datos %>%
+  count(tipo, sort = TRUE) %>%
+  ggplot(aes(x = reorder(tipo, -n), y = n, fill = tipo)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = n), vjust = -0.5, size = 4) +
+  coord_flip() +
+  labs(
+    title = "Distribución por Tipo de Documento",
+    x = "Tipo",
+    y = "Cantidad",
+    caption = "Fuente: Elaboración propia"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## Análisis Temporal
+
+### Evolución Mensual de Registros
+
+```{r evolucion-mensual}
+# Asegurar que la columna fecha existe y es Date
+if ("fecha" %in% names(datos)) {
+  datos <- datos %>%
+    filter(!is.na(fecha)) %>%
+    mutate(mes = floor_date(fecha, "month"))
+  
+  evolucion <- datos %>%
+    count(mes, fuente) %>%
+    complete(mes = seq(min(mes), max(mes), by = "month"), fuente, fill = list(n = 0))
+  
+  evolucion %>%
+    ggplot(aes(x = mes, y = n, color = fuente, group = fuente)) +
+    geom_line(size = 1.2) +
+    geom_point(size = 2) +
+    labs(
+      title = "Evolución Mensual de Registros por Fuente",
+      x = "Mes",
+      y = "Cantidad de Registros",
+      caption = "Fuente: Elaboración propia en base a scraping web"
+    ) +
+    scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+} else {
+  cat("No hay columna 'fecha' disponible para análisis temporal.")
+}
+```
+
+### Heatmap de Actividad por Mes y Fuente
+
+```{r heatmap-actividad}
+if ("fecha" %in% names(datos)) {
+  datos %>%
+    filter(!is.na(fecha)) %>%
+    mutate(mes = floor_date(fecha, "month")) %>%
+    count(mes, fuente) %>%
+    ggplot(aes(x = mes, y = fuente, fill = n)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient(low = "#feebe2", high = "#990000", name = "Cantidad") +
+    labs(
+      title = "Actividad por Mes y Fuente",
+      x = "Mes",
+      y = "Fuente",
+      caption = "Fuente: Elaboración propia"
+    ) +
+    scale_x_date(date_labels = "%b %Y", date_breaks = "2 months") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+```
+
+## Análisis Detallado por Fuente
+
+### FNE - Fiscalía Nacional Económica
+
+```{r analisis-fne}
+if ("FNE" %in% unique(datos$fuente)) {
+  datos_fne <- datos %>% filter(fuente == "FNE")
+  
+  cat(sprintf("\nTotal de registros FNE: %d\n\n", nrow(datos_fne)))
+  
+  if (nrow(datos_fne) > 0) {
+    datos_fne %>%
+      count(tipo, sort = TRUE) %>%
+      ggplot(aes(x = reorder(tipo, -n), y = n, fill = tipo)) +
+      geom_bar(stat = "identity") +
+      geom_text(aes(label = n), vjust = -0.5, size = 5) +
+      labs(
+        title = "FNE - Registros por Tipo",
+        x = "Tipo",
+        y = "Cantidad"
+      ) +
+      theme_minimal() +
+      theme(legend.position = "none")
+  }
+} else {
+  cat("No hay datos disponibles para FNE")
+}
+```
+
+### TDLC - Tribunal de Defensa de la Libre Competencia
+
+```{r analisis-tdlc}
+if ("TDLC" %in% unique(datos$fuente)) {
+  datos_tdlc <- datos %>% filter(fuente == "TDLC")
+  
+  cat(sprintf("\nTotal de registros TDLC: %d\n\n", nrow(datos_tdlc)))
+  
+  if (nrow(datos_tdlc) > 0) {
+    datos_tdlc %>%
+      count(tipo, sort = TRUE) %>%
+      ggplot(aes(x = reorder(tipo, -n), y = n, fill = tipo)) +
+      geom_bar(stat = "identity") +
+      geom_text(aes(label = n), vjust = -0.5, size = 5) +
+      labs(
+        title = "TDLC - Registros por Tipo",
+        x = "Tipo",
+        y = "Cantidad"
+      ) +
+      theme_minimal() +
+      theme(legend.position = "none")
+  }
+} else {
+  cat("No hay datos disponibles para TDLC")
+}
+```
+
+### CORFO - Corporación de Fomento
+
+```{r analisis-corfo}
+if ("CORFO" %in% unique(datos$fuente)) {
+  datos_corfo <- datos %>% filter(fuente == "CORFO")
+  
+  cat(sprintf("\nTotal de registros CORFO: %d\n\n", nrow(datos_corfo)))
+  
+  if (nrow(datos_corfo) > 0) {
+    datos_corfo %>%
+      count(tipo, sort = TRUE) %>%
+      ggplot(aes(x = reorder(tipo, -n), y = n, fill = tipo)) +
+      geom_bar(stat = "identity") +
+      geom_text(aes(label = n), vjust = -0.5, size = 5) +
+      labs(
+        title = "CORFO - Registros por Tipo",
+        x = "Tipo",
+        y = "Cantidad"
+      ) +
+      theme_minimal() +
+      theme(legend.position = "none")
+  }
+} else {
+  cat("No hay datos disponibles para CORFO")
+}
+```
+
+## Conclusiones
+
+Este análisis proporciona una visión general de la actividad regulatoria y de fomento productivo registrada en las principales instituciones del Ministerio de Economía. 
+
+**Próximos pasos recomendados:**
+
+1. **Actualización continua**: Ejecutar los scripts de scraping semanalmente para mantener los datos actualizados
+2. **Análisis de texto**: Implementar NLP para analizar el contenido de normativas y resoluciones
+3. **Indicadores clave**: Desarrollar KPIs específicos para cada institución
+4. **Alertas tempranas**: Configurar sistemas de alerta para cambios regulatorios importantes
+
+---
+
+*Informe generado automáticamente el `r format(Sys.time(), '%d/%m/%Y a las %H:%M')`*
+
+*Para más información, contactar al equipo de datos del Ministerio de Economía*
