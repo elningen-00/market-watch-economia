@@ -169,11 +169,6 @@ Ejecute primero los scripts de scraping en orden.
 - Verifique su conexión a internet
 - Aumente el timeout en `config/config.yml`
 - Los sitios pueden estar temporalmente no disponibles
-
-## Licencia
-
-Uso exclusivo institucional - Ministerio de Economía, Fomento y Turismo de Chile.
-
 ---
 
 *Última actualización: `r Sys.Date()`*
