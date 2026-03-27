@@ -1,0 +1,45 @@
+# Configuración para market-watch-economia
+# URLs de fuentes de datos y configuración de API
+
+# Ministerios y organismos
+economia:
+  url_base: "https://www.economia.gob.cl"
+  normativas_path: "/normativas"
+  oficios_path: "/oficios"
+
+fne:
+  url_base: "https://www.fne.gob.cl"
+  boletines_path: "/boletines"
+  investigaciones_path: "/investigaciones"
+  resoluciones_path: "/resoluciones"
+
+tdlc:
+  url_base: "https://www.tdlc.cl"
+  jurisprudencia_path: "/jurisprudencia"
+  causas_path: "/causas"
+
+corfo:
+  url_base: "https://www.corfo.cl"
+  programas_path: "/programas"
+  innovacion_path: "/innovacion"
+
+energia:
+  url_base: "https://www.energia.gob.cl"
+  hidrogeno_path: "/hidrogeno-verde"
+
+mineria:
+  url_base: "https://www.mineria.gob.cl"
+  litio_path: "/litio"
+  regulacion_path: "/regulacion"
+
+# Configuración de scraping
+scraping:
+  user_agent: "Mozilla/5.0 (compatible; MarketWatch-Economia/1.0)"
+  delay_min: 2  # segundos entre requests
+  delay_max: 5  # segundos entre requests
+  max_retries: 3
+
+# Rutas de datos
+data:
+  raw_path: "data/raw"
+  processed_path: "data/processed"

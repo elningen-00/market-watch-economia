@@ -1,0 +1,69 @@
+```
+# R/RStudio
+.Rproj.user/
+.Rhistory
+.Rdata
+*.RData
+*.rds
+*.Rds
+*.rda
+*.Rda
+*.renviron
+.Rprofile
+.Rbuildignore
+*.so
+*.dll
+*.o
+*.o.w64
+*.a
+*.dylib
+*.jar
+*.class
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.tiff
+*.bmp
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Environment files
+.env
+.env.local
+*.env
+*.env.*
+
+# Cache directories
+.cache/
+*.cache
+.Rapp.history
+
+# Output and derived files
+analysis/*.html
+analysis/*.nb.html
+analysis/*_files/
+analysis/figure/
+docs/
+
+# Dependencies
+packrat/
+renv/
+```
