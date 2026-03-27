@@ -1,0 +1,315 @@
+---
+title: "Tendencias Normativas y de Jurisprudencia"
+subtitle: "Observatorio de Regulación de Mercados - Ministerio de Economía"
+author: "Market Watch Economía"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.path = "analysis/figures/"
+)
+
+library(tidyverse)
+library(lubridate)
+library(scales)
+library(wordcloud2)
+library(gt)
+
+# Cargar configuración
+source("scripts/utils.R")
+config <- load_config()
+
+# Cargar datos procesados más recientes
+fecha_hoy <- format_date_for_filename()
+archivo_tendencias <- paste0("data/processed/tendencias_normativas_", fecha_hoy, ".rds")
+
+if (file.exists(archivo_tendencias)) {
+  tendencias <- readRDS(archivo_tendencias)
+} else {
+  # Si no existe, intentar cargar desde consolidado
+  archivo_consolidado <- paste0("data/processed/datos_consolidados_", fecha_hoy, ".rds")
+  if (file.exists(archivo_consolidado)) {
+    datos <- readRDS(archivo_consolidado)
+    tendencias <- datos %>% 
+      filter(fuente %in% c("FNE", "TDLC") & 
+               categoria %in% c("Resolución", "Investigación", "Jurisprudencia"))
+  } else {
+    stop("No se encontraron datos procesados. Ejecutar scripts de scraping primero.")
+  }
+}
+```
+
+## Resumen Ejecutivo
+
+Este informe analiza las tendencias en normativas, resoluciones e investigaciones provenientes de la FNE y jurisprudencia del TDLC.
+
+```{r resumen-general}
+# KPIs principales
+total_registros <- nrow(tendencias)
+total_fne <- sum(tendencias$fuente == "FNE")
+total_tdlc <- sum(tendencias$fuente == "TDLC")
+periodo_min <- min(tendencias$fecha_normalizada, na.rm = TRUE)
+periodo_max <- max(tendencias$fecha_normalizada, na.rm = TRUE)
+
+# Crear tabla de KPIs
+kpi_table <- tibble(
+  Indicador = c("Total Registros", "Registros FNE", "Registros TDLC", "Período Cubierto"),
+  Valor = c(
+    format(total_registros, big.mark = ".", scientific = FALSE),
+    format(total_fne, big.mark = ".", scientific = FALSE),
+    format(total_tdlc, big.mark = ".", scientific = FALSE),
+    paste(format(periodo_min, "%d/%m/%Y"), "-", format(periodo_max, "%d/%m/%Y"))
+  )
+)
+
+gt(kpi_table) %>%
+  tab_header(title = "Indicadores Clave") %>%
+  cols_align(align = "left", columns = everything())
+```
+
+## Distribución por Fuente y Categoría
+
+```{r distribucion-fuente-categoria, fig.height=6, fig.width=10}
+tendencias %>%
+  count(fuente, categoria, sort = TRUE) %>%
+  ggplot(aes(x = fuente, y = n, fill = categoria)) +
+  geom_col(position = "dodge", alpha = 0.8) +
+  geom_text(aes(label = n), 
+            position = position_dodge(width = 0.9), 
+            vjust = -0.5, size = 4) +
+  labs(
+    title = "Distribución por Fuente y Categoría",
+    x = "Fuente",
+    y = "Cantidad"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1")
+```
+
+## Evolución Temporal Mensual
+
+```{r evolucion-mensual, fig.height=7, fig.width=12}
+tendencias %>%
+  filter(!is.na(mes)) %>%
+  count(mes, fuente) %>%
+  ggplot(aes(x = mes, y = n, color = fuente, group = fuente)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 3) +
+  facet_wrap(~categoria, scales = "free_y") +
+  labs(
+    title = "Evolución Temporal por Fuente y Categoría",
+    x = "Mes",
+    y = "Cantidad"
+  ) +
+  theme_minimal() +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_color_brewer(palette = "Dark2")
+```
+
+## Análisis por Año
+
+```{r analisis-anual, fig.height=6, fig.width=10}
+tendencias %>%
+  filter(!is.na(anio)) %>%
+  count(anio, fuente) %>%
+  ggplot(aes(x = anio, y = n, fill = fuente)) +
+  geom_col(position = "fill", alpha = 0.8) +
+  geom_text(aes(label = scales::percent(n/sum(n), accuracy = 1)),
+            position = position_fill(vjust = 0.5),
+            size = 4, color = "white") +
+  labs(
+    title = "Distribución Porcentual Anual por Fuente",
+    x = "Año",
+    y = "Porcentaje"
+  ) +
+  theme_minimal() +
+  scale_y_continuous(labels = percent_format()) +
+  scale_fill_brewer(palette = "Set1")
+```
+
+## Word Cloud de Términos en Títulos
+
+```{r wordcloud, fig.height=8, fig.width=10, eval=TRUE}
+# Preparar texto para wordcloud
+library(tm)
+library(SnowballC)
+
+texto_completo <- tendencias %>%
+  filter(!is.na(titulo_limpio)) %>%
+  pull(titulo_limpio) %>%
+  paste(collapse = " ")
+
+# Crear corpus
+corpus <- Corpus(VectorSource(texto_completo))
+
+# Limpieza básica
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removeWords, stopwords("spanish"))
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, stripWhitespace)
+
+# Crear matriz de términos
+dtm <- TermDocumentMatrix(corpus)
+m <- as.matrix(dtm)
+v <- sort(rowSums(m), decreasing = TRUE)
+
+# Filtrar términos frecuentes
+d <- data.frame(word = names(v), freq = v)
+d <- d %>% filter(freq > 2, nchar(word) > 3)
+
+if (nrow(d) > 0) {
+  wordcloud2(d, size = 1.5, color = "random-light", backgroundColor = "white")
+} else {
+  plot.new()
+  text(0.5, 0.5, "Insuficientes datos para word cloud", cex = 1.5)
+}
+```
+
+## Top 20 Términos Más Frecuentes
+
+```{r top-terminos, fig.height=8, fig.width=10}
+if (exists("d") && nrow(d) > 0) {
+  d %>%
+    head(20) %>%
+    ggplot(aes(x = reorder(word, freq), y = freq, fill = freq)) +
+    geom_col(alpha = 0.8) +
+    coord_flip() +
+    labs(
+      title = "Top 20 Términos Más Frecuentes en Títulos",
+      x = "Término",
+      y = "Frecuencia"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "none") +
+    scale_fill_gradient(low = "#3498DB", high = "#2C3E50")
+} else {
+  plot.new()
+  text(0.5, 0.5, "Insuficientes datos para análisis", cex = 1.5)
+}
+```
+
+## Heatmap: Mes vs Categoría
+
+```{r heatmap-mes-categoria, fig.height=8, fig.width=12}
+tendencias %>%
+  filter(!is.na(mes)) %>%
+  mutate(mes_nombre = format(mes, "%b %Y")) %>%
+  count(mes_nombre, categoria) %>%
+  ggplot(aes(x = mes_nombre, y = categoria, fill = n)) +
+  geom_tile(color = "white", alpha = 0.9) +
+  geom_text(aes(label = n), size = 4, fontface = "bold") +
+  labs(
+    title = "Heatmap: Actividad Normativa por Mes y Categoría",
+    x = "Mes",
+    y = "Categoría"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  scale_fill_gradient(low = "#FEF9E7", high = "#D35400", name = "Cantidad")
+```
+
+## Comparativa FNE vs TDLC
+
+```{r comparativa-fne-tdlc, fig.height=6, fig.width=10}
+tendencias %>%
+  count(fuente, categoria) %>%
+  group_by(fuente) %>%
+  mutate(porcentaje = n / sum(n) * 100) %>%
+  ggplot(aes(x = fuente, y = porcentaje, fill = categoria)) +
+  geom_col(position = "stack", alpha = 0.8) +
+  geom_text(aes(label = paste0(round(porcentaje, 1), "%")),
+            position = position_stack(vjust = 0.5),
+            size = 4, color = "white") +
+  labs(
+    title = "Composición Porcentual por Fuente",
+    x = "Fuente",
+    y = "Porcentaje"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set2")
+```
+
+## Estadísticas Descriptivas por Categoría
+
+```{r estadisticas-descriptivas}
+tendencias %>%
+  filter(!is.na(fecha_normalizada)) %>%
+  group_by(fuente, categoria) %>%
+  summarise(
+    total = n(),
+    primera_fecha = min(fecha_normalizada),
+    ultima_fecha = max(fecha_normalizada),
+    dias_cobertura = as.numeric(ultima_fecha - primera_fecha),
+    promedio_mensual = round(n / (dias_cobertura/30), 2),
+    .groups = "drop"
+  ) %>%
+  gt() %>%
+  tab_header(title = "Estadísticas Descriptivas por Categoría") %>%
+  fmt_date(columns = c(primera_fecha, ultima_fecha), date_style = 3) %>%
+  cols_label(
+    fuente = "Fuente",
+    categoria = "Categoría",
+    total = "Total",
+    primera_fecha = "Primera Fecha",
+    ultima_fecha = "Última Fecha",
+    dias_cobertura = "Días Cobertura",
+    promedio_mensual = "Promedio/Mes"
+  )
+```
+
+## Conclusiones y Recomendaciones
+
+```{r conclusiones}
+# Generar insights automáticos
+insights <- c()
+
+# Insight 1: Fuente predominante
+fuente_predominante <- tendencias %>% count(fuente, sort = TRUE) %>% slice(1)
+insights <- c(insights, paste0("La fuente con más registros es **", fuente_predominante$fuente, "** con ", fuente_predominante$n, " documentos."))
+
+# Insight 2: Categoría más activa
+categoria_mas_activa <- tendencias %>% count(categoria, sort = TRUE) %>% slice(1)
+insights <- c(insights, paste0("La categoría más activa es **", categoria_mas_activa$categoria, "** representando el ", round(categoria_mas_activa$n/nrow(tendencias)*100, 1), "% del total."))
+
+# Insight 3: Tendencia reciente
+if (n_distinct(tendencias$mes) >= 3) {
+  tendencia_reciente <- tendencias %>%
+    filter(!is.na(mes)) %>%
+    count(mes) %>%
+    arrange(desc(mes)) %>%
+    head(3) %>%
+    mutate(cambio = n - lag(n))
+  
+  cambio_promedio <- mean(tendencia_reciente$cambio, na.rm = TRUE)
+  direccion <- ifelse(cambio_promedio > 0, "aumento", "disminución")
+  insights <- c(insights, paste0("En los últimos meses se observa una tendencia de ", direccion, " en la actividad normativa."))
+}
+
+# Display insights
+tibble(Insight = seq_along(insights), Descripción = insights) %>%
+  gt() %>%
+  tab_header(title = "Insights Automáticos del Análisis") %>%
+  cols_hide(columns = "Insight") %>%
+  tab_footnote(
+    footnote = "Generado automáticamente basado en los datos disponibles",
+    locations = cells_title(groups = "title")
+  )
+```
+
+---
+
+*Informe generado automáticamente por Market Watch Economía - `r Sys.time()`*
