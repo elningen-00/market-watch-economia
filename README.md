@@ -170,10 +170,6 @@ Ejecute primero los scripts de scraping en orden.
 - Aumente el timeout en `config/config.yml`
 - Los sitios pueden estar temporalmente no disponibles
 
-## Contribuciones
-
-Este es un proyecto interno del Ministerio de Economía. Para sugerencias o reportar problemas, contactar al equipo de datos.
-
 ## Licencia
 
 Uso exclusivo institucional - Ministerio de Economía, Fomento y Turismo de Chile.
