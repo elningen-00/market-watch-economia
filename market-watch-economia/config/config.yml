@@ -1,0 +1,60 @@
+# Configuración de fuentes de datos para market-watch-economia
+
+fuentes:
+  fne:
+    nombre: "Fiscalía Nacional Económica"
+    url_base: "https://www.fne.gob.cl"
+    boletines: "/boletines/"
+    investigaciones: "/investigaciones/"
+    resoluciones: "/resoluciones/"
+    delay: 2  # segundos entre requests
+    
+  tdlc:
+    nombre: "Tribunal de Defensa de la Libre Competencia"
+    url_base: "https://www.tdlc.cl"
+    jurisprudencia: "/jurisprudencia/"
+    causas: "/causas/"
+    sentencias: "/sentencias/"
+    delay: 2
+    
+  corfo:
+    nombre: "Corporación de Fomento de la Producción"
+    url_base: "https://www.corfo.cl"
+    programas: "/programas/"
+    noticias: "/noticias/"
+    innovacion: "/innovacion/"
+    delay: 2
+    
+  economia:
+    nombre: "Ministerio de Economía"
+    url_base: "https://www.economia.gob.cl"
+    normativas: "/normativas/"
+    oficios: "/oficios/"
+    delay: 2
+    
+  energia:
+    nombre: "Ministerio de Energía"
+    url_base: "https://www.energia.gob.cl"
+    hidrogeno: "/hidrogeno-verde/"
+    normativas: "/normativas/"
+    delay: 2
+    
+  mineria:
+    nombre: "Ministerio de Minería"
+    url_base: "https://www.mineria.gob.cl"
+    litio: "/litio/"
+    normativas: "/normativas/"
+    delay: 2
+
+# Configuración general
+general:
+  user_agent: "MarketWatch-Economia-Bot/1.0 (contacto@economia.gob.cl)"
+  timeout: 30  # segundos
+  max_retries: 3
+  sleep_between_sources: 5  # segundos entre fuentes diferentes
+  
+# Rutas de almacenamiento
+rutas:
+  raw: "data/raw/"
+  processed: "data/processed/"
+  figures: "analysis/figures/"
